@@ -40,7 +40,7 @@
 }
 
 * { margin:0; padding:0; box-sizing:border-box; -webkit-text-size-adjust:100%; -webkit-tap-highlight-color:transparent; }
-html, body { height:100%; overflow:hidden; -webkit-overflow-scrolling:touch; }
+html, body { height:100%; overflow:hidden; }
 body { font-family:var(--sans); background:var(--bg); color:var(--text); font-size:15px; }
 
 /* ═══════════ AUTH SCREENS ═══════════ */
@@ -186,10 +186,13 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text); font-si
 }
 
 /* ═══════════ MAIN CONTENT ═══════════ */
-.main-content { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; scroll-behavior:smooth; }
+.main-content { flex:1; overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; position:relative; }
 .main-content::-webkit-scrollbar { display:none; }
 .page { display:none; padding:16px 14px 80px; max-width:720px; margin:0 auto; }
 .page.active { display:block; }
+/* Ensure all form inputs don't cause zoom on iOS */
+input, select, textarea { font-size:16px !important; }
+@media(min-width:400px) { input, select, textarea { font-size:inherit !important; } }
 
 /* ═══════════ DASHBOARD ═══════════ */
 .greeting { margin-bottom:16px; }
@@ -300,7 +303,7 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text); font-si
 .ci {
   display:flex; align-items:flex-start; gap:14px; padding:13px 16px;
   border-bottom:1px solid rgba(255,255,255,0.04); cursor:pointer;
-  touch-action:pan-y; transition:background 0.15s;
+  touch-action:pan-y pinch-zoom; transition:background 0.15s;
   user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent;
 }
 .ci:last-of-type { border-bottom:none; }
@@ -585,9 +588,15 @@ body.light-mode .doc-sel { background:var(--bg2); color:var(--text); }
   <div class="auth-card">
     <div class="auth-card-title">Welcome back</div>
     <div class="auth-card-sub">Enter your email and password to access your tracker.</div>
-    <input class="auth-input" type="email" id="li-email" placeholder="Email address" autocomplete="email">
-    <input class="auth-input" type="password" id="li-pwd" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <input class="auth-input" type="email" id="li-email" placeholder="Email address" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('li-pwd').focus()">
+    <input class="auth-input" type="password" id="li-pwd" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="auth-error" id="li-err"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;" onclick="toggleRemember()">
+      <div id="remember-box" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;">
+        <span id="remember-tick" style="display:none;color:var(--gold);font-size:13px;font-weight:700;">✓</span>
+      </div>
+      <span style="font-size:13px;color:var(--muted);">Remember my email on this device</span>
+    </div>
     <button class="auth-btn" onclick="doLogin()" ontouchend="event.preventDefault();doLogin();">Sign In &#8594;</button>
     <button class="auth-btn-outline" onclick="showScreen('screen-verify')">New user? Create account</button>
   </div>
@@ -839,127 +848,128 @@ body.light-mode .doc-sel { background:var(--bg2); color:var(--text); }
       <!-- BUDGET -->
       <div class="page" id="page-budget">
         <div class="sec-h">Budget Planner</div>
-        <p class="sec-p">Track your savings, plan your timeline and convert currencies — all in one place.</p>
+        <p class="sec-p">Track your savings in your currency and know exactly when you will be ready for Japan.</p>
 
-        <!-- CURRENCY SELECTOR -->
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px;">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Currency</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div>
-              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Select currency</div>
-              <select id="b-currency" onchange="updateCurrencyRates()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;">
-                <option value="USD">🇺🇸 USD — US Dollar</option>
-                <option value="NGN">🇳🇬 NGN — Nigerian Naira</option>
-                <option value="GHS">🇬🇭 GHS — Ghanaian Cedi</option>
-                <option value="KES">🇰🇪 KES — Kenyan Shilling</option>
-                <option value="ZAR">🇿🇦 ZAR — South African Rand</option>
-                <option value="GBP">🇬🇧 GBP — British Pound</option>
-                <option value="EUR">🇪🇺 EUR — Euro</option>
-                <option value="JPY">🇯🇵 JPY — Japanese Yen</option>
-              </select>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Rate to USD (manual)</div>
-              <input type="number" id="b-rate" placeholder="e.g. 1600" step="0.01"
-                style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;"
+        <!-- STEP 1: Currency -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Step 1 — Choose your currency</div>
+          <select id="b-currency" onchange="onCurrencyChange()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;margin-bottom:10px;">
+            <option value="USD">🇺🇸 USD — US Dollar</option>
+            <option value="NGN">🇳🇬 NGN — Nigerian Naira</option>
+            <option value="GHS">🇬🇭 GHS — Ghanaian Cedi</option>
+            <option value="KES">🇰🇪 KES — Kenyan Shilling</option>
+            <option value="ZAR">🇿🇦 ZAR — South African Rand</option>
+            <option value="GBP">🇬🇧 GBP — British Pound</option>
+            <option value="EUR">🇪🇺 EUR — Euro</option>
+            <option value="JPY">🇯🇵 JPY — Japanese Yen</option>
+          </select>
+          <div id="b-rate-row" style="display:none;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Exchange rate: 1 USD = how much of your currency?</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" id="b-rate" placeholder="e.g. 1600 for Naira" step="0.01"
+                style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;font-size:15px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;"
                 oninput="calcBudget()">
+              <button onclick="openGoogleRate()" style="background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--gold);cursor:pointer;font-family:var(--sans);touch-action:manipulation;white-space:nowrap;">
+                Check rate 🔍
+              </button>
             </div>
+            <div id="rate-hint" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
           </div>
-          <div id="rate-info" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">
-            Enter the current exchange rate from your currency to USD. Check Google for the live rate.
-          </div>
-          <button onclick="fetchRate()" style="margin-top:10px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--gold);cursor:pointer;font-family:var(--sans);touch-action:manipulation;">
-            🔄 Get Current Rate from Google
-          </button>
+          <div id="b-usd-note" style="font-size:12px;color:var(--green);margin-top:4px;">You are using USD — enter amounts in US Dollars below.</div>
         </div>
 
-        <!-- SAVINGS INPUTS -->
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px;">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Your Savings</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <!-- STEP 2: Enter savings -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Step 2 — Enter your savings <span id="b-currency-label" style="color:var(--gold);">(USD)</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div style="background:var(--bg2);border-radius:12px;padding:14px;">
-              <div id="b-cur-label" style="font-size:11px;color:var(--muted);margin-bottom:4px;">Current Savings (USD)</div>
-              <input class="budget-input" type="number" id="b-cur" placeholder="0" oninput="calcBudget()">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">I currently have</div>
+              <input class="budget-input" type="number" id="b-cur" placeholder="0" oninput="calcBudget()" min="0">
             </div>
             <div style="background:var(--bg2);border-radius:12px;padding:14px;">
-              <div id="b-mon-label" style="font-size:11px;color:var(--muted);margin-bottom:4px;">Monthly Savings (USD)</div>
-              <input class="budget-input" type="number" id="b-mon" placeholder="0" oninput="calcBudget()">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">I save per month</div>
+              <input class="budget-input" type="number" id="b-mon" placeholder="0" oninput="calcBudget()" min="0">
             </div>
             <div style="background:var(--bg2);border-radius:12px;padding:14px;">
-              <div id="b-tar-label" style="font-size:11px;color:var(--muted);margin-bottom:4px;">Savings Target (USD)</div>
-              <input class="budget-input" type="number" id="b-tar" placeholder="4000" oninput="calcBudget()">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">My savings target</div>
+              <input class="budget-input" type="number" id="b-tar" placeholder="0" oninput="calcBudget()" min="0">
             </div>
             <div style="background:var(--bg2);border-radius:12px;padding:14px;">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">ALT Salary (¥/month)</div>
-              <input class="budget-input" type="number" id="b-sal" placeholder="200000" oninput="calcBudget()">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">ALT salary (¥/month)</div>
+              <input class="budget-input" type="number" id="b-sal" placeholder="200000" oninput="calcBudget()" min="0">
             </div>
+          </div>
+          <div style="margin-top:12px;padding:10px 12px;background:var(--blue-bg);border:1px solid rgba(74,158,255,0.2);border-radius:10px;font-size:12px;color:var(--blue);">
+            💡 Recommended target: Most ALT companies suggest having $3,000–$6,000 (or equivalent) saved before arrival.
           </div>
         </div>
 
         <!-- RESULT -->
-        <div id="b-result" style="display:none;" class="budget-result">
-          <div class="budget-result-label">Months until your target</div>
-          <span class="budget-big" id="b-months">--</span>
+        <div id="b-result" style="display:none;background:var(--card);border:1px solid var(--gold-border);border-radius:16px;padding:20px;margin-bottom:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Months until your target</div>
+          <div class="budget-big" id="b-months">--</div>
           <p class="budget-msg" id="b-msg"></p>
-          <div id="b-equiv" style="font-size:12px;color:var(--gold);margin-top:6px;"></div>
+          <div id="b-usd-equiv" style="font-size:12px;color:var(--gold);margin-top:6px;"></div>
+          <div id="b-still-need" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
         </div>
 
-        <!-- PROGRESS BAR CHART -->
-        <div id="b-chart" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px;">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Savings Progress</div>
-          <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <!-- PROGRESS -->
+        <div id="b-chart" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Savings Progress</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <span style="font-size:13px;color:var(--text);">Saved so far</span>
-            <span id="chart-saved-pct" style="font-size:13px;font-weight:700;color:var(--gold);">0%</span>
+            <span id="chart-saved-pct" style="font-size:14px;font-weight:700;color:var(--gold);">0%</span>
           </div>
-          <div style="height:14px;background:var(--bg2);border-radius:7px;overflow:hidden;margin-bottom:12px;">
+          <div style="height:14px;background:var(--bg2);border-radius:7px;overflow:hidden;margin-bottom:14px;">
             <div id="chart-bar" style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:7px;transition:width 0.6s ease;width:0%;"></div>
           </div>
-          <!-- Monthly breakdown -->
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;margin-top:4px;">Monthly Savings Plan</div>
-          <div id="monthly-chart" style="display:flex;align-items:flex-end;gap:4px;height:80px;"></div>
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Monthly Savings Plan</div>
+          <div id="monthly-chart" style="display:flex;align-items:flex-end;gap:3px;height:80px;padding-bottom:4px;"></div>
           <div style="display:flex;justify-content:space-between;margin-top:4px;">
             <span style="font-size:10px;color:var(--muted);">Now</span>
             <span id="chart-target-label" style="font-size:10px;color:var(--green);">Target ✓</span>
           </div>
         </div>
 
-        <!-- CURRENCY CONVERTER -->
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px;">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💱 Quick Currency Converter</div>
-          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:10px;">
+        <!-- QUICK CONVERTER -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💱 Quick Converter</div>
+          <div style="display:grid;grid-template-columns:1fr 28px 1fr;gap:8px;align-items:center;margin-bottom:10px;">
             <div>
-              <input type="number" id="conv-amount" placeholder="Amount" oninput="convertCurrency()"
-                style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;font-weight:700;">
-              <select id="conv-from" onchange="convertCurrency()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;margin-top:6px;">
-                <option value="NGN">NGN</option>
-                <option value="GHS">GHS</option>
-                <option value="KES">KES</option>
-                <option value="ZAR">ZAR</option>
-                <option value="GBP">GBP</option>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-                <option value="JPY">JPY</option>
+              <input type="number" id="conv-amount" placeholder="Enter amount" oninput="convertCurrency()"
+                style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;font-size:16px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;font-weight:600;margin-bottom:6px;">
+              <select id="conv-from" onchange="convertCurrency()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;">
+                <option value="NGN">🇳🇬 NGN</option>
+                <option value="GHS">🇬🇭 GHS</option>
+                <option value="KES">🇰🇪 KES</option>
+                <option value="ZAR">🇿🇦 ZAR</option>
+                <option value="GBP">🇬🇧 GBP</option>
+                <option value="EUR">🇪🇺 EUR</option>
+                <option value="USD">🇺🇸 USD</option>
+                <option value="JPY">🇯🇵 JPY</option>
               </select>
             </div>
-            <div style="text-align:center;font-size:20px;color:var(--muted);">⇄</div>
+            <div style="text-align:center;color:var(--muted);font-size:18px;margin-top:-20px;">⇄</div>
             <div>
-              <div id="conv-result" style="background:var(--bg2);border:1px solid var(--gold-border);border-radius:10px;padding:10px 12px;font-size:16px;color:var(--gold);font-weight:700;min-height:44px;display:flex;align-items:center;">--</div>
-              <select id="conv-to" onchange="convertCurrency()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;margin-top:6px;">
-                <option value="USD">USD</option>
-                <option value="JPY">JPY</option>
-                <option value="NGN">NGN</option>
-                <option value="GHS">GHS</option>
-                <option value="GBP">GBP</option>
-                <option value="EUR">EUR</option>
+              <div id="conv-result" style="background:var(--bg2);border:1.5px solid var(--gold-border);border-radius:10px;padding:11px 12px;font-size:16px;color:var(--gold);font-weight:700;min-height:44px;display:flex;align-items:center;margin-bottom:6px;">--</div>
+              <select id="conv-to" onchange="convertCurrency()" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;">
+                <option value="USD">🇺🇸 USD</option>
+                <option value="JPY">🇯🇵 JPY</option>
+                <option value="NGN">🇳🇬 NGN</option>
+                <option value="GHS">🇬🇭 GHS</option>
+                <option value="GBP">🇬🇧 GBP</option>
+                <option value="EUR">🇪🇺 EUR</option>
+                <option value="ZAR">🇿🇦 ZAR</option>
+                <option value="KES">🇰🇪 KES</option>
               </select>
             </div>
           </div>
-          <div id="conv-rate-info" style="font-size:11px;color:var(--muted);text-align:center;line-height:1.5;">Enter exchange rates in the Currency section above to enable conversion.</div>
+          <div id="conv-rate-info" style="font-size:11px;color:var(--muted);text-align:center;line-height:1.5;">Enter your exchange rate above to get accurate conversions.</div>
         </div>
 
         <div id="b-tip" style="display:none;"></div>
-        <div class="info-box blue">Most ALT companies recommend $3,000 to $6,000 saved before your first paycheck. This covers rent deposit, initial groceries and transport.</div>
-        <div style="margin-top:10px;" class="info-box green">Use Wise or Remitly to transfer money internationally — much lower fees than traditional banks.</div>
+        <div class="info-box green" style="margin-bottom:8px;">Use Wise or Remitly for international transfers — fees are much lower than traditional banks.</div>
+        <div class="info-box green">Name a savings account "Japan Fund" — the name keeps you motivated every time you transfer.</div>
       </div>
 
       <!-- RESOURCES -->
@@ -1266,19 +1276,80 @@ function doCreate() {
   enterApp();
 }
 
+let rememberMe = false;
+
+function toggleRemember() {
+  rememberMe = !rememberMe;
+  const box = document.getElementById('remember-box');
+  const tick = document.getElementById('remember-tick');
+  if (box) box.style.borderColor = rememberMe ? 'var(--gold)' : 'var(--border)';
+  if (box) box.style.background = rememberMe ? 'var(--gold-dim)' : 'var(--bg2)';
+  if (tick) tick.style.display = rememberMe ? 'block' : 'none';
+}
+
+function loadRememberedEmail() {
+  try {
+    const saved = localStorage.getItem('op_remembered_email');
+    if (saved) {
+      const emailField = document.getElementById('li-email');
+      if (emailField) {
+        emailField.value = saved;
+        rememberMe = true;
+        // Visually check the box
+        const box = document.getElementById('remember-box');
+        const tick = document.getElementById('remember-tick');
+        if (box) { box.style.borderColor = 'var(--gold)'; box.style.background = 'var(--gold-dim)'; }
+        if (tick) tick.style.display = 'block';
+        // Focus password field since email is filled
+        setTimeout(() => {
+          const pwdField = document.getElementById('li-pwd');
+          if (pwdField) pwdField.focus();
+        }, 300);
+      }
+    }
+  } catch(e) {}
+}
+
 function doLogin() {
-  const email = document.getElementById('li-email').value.trim().toLowerCase();
-  const pwd = document.getElementById('li-pwd').value;
+  const emailField = document.getElementById('li-email');
+  const pwdField = document.getElementById('li-pwd');
   const err = document.getElementById('li-err');
+
+  const email = emailField ? emailField.value.trim().toLowerCase() : '';
+  const pwd = pwdField ? pwdField.value : '';
+
+  if (!email) {
+    err.textContent = 'Please enter your email address.';
+    err.style.display = 'block';
+    if (emailField) emailField.focus();
+    return;
+  }
+
+  if (!pwd) {
+    err.textContent = 'Please enter your password.';
+    err.style.display = 'block';
+    if (pwdField) pwdField.focus();
+    return;
+  }
 
   const accounts = getAccounts();
   const acct = accounts[email];
 
   if (!acct || btoa(pwd) !== acct.pwd) {
-    err.textContent = 'Incorrect email or password. Please try again.';
+    err.textContent = 'Incorrect email or password. Please check and try again.';
     err.style.display = 'block';
+    if (pwdField) { pwdField.value = ''; pwdField.focus(); }
     return;
   }
+
+  // Save remembered email if checked
+  try {
+    if (rememberMe) {
+      localStorage.setItem('op_remembered_email', email);
+    } else {
+      localStorage.removeItem('op_remembered_email');
+    }
+  } catch(e) {}
 
   err.style.display = 'none';
   currentUser = acct;
@@ -1525,15 +1596,13 @@ function buildChecklist() {
       <span class="cl-count" id="sc-${si}">${done}/${stage.items.length}</span>
       <span class="cl-chev">&#9660;</span>
     `;
-    let cardTouchY = 0;
-    hBtn.addEventListener('touchstart', function(e) { cardTouchY = e.touches[0].clientY; }, { passive: true });
+    let _cty = 0, _cscrolled = false;
+    hBtn.addEventListener('touchstart', function(e) { _cty = e.touches[0].clientY; _cscrolled = false; }, { passive: true });
+    hBtn.addEventListener('touchmove', function(e) { if(Math.abs(e.touches[0].clientY - _cty) > 8) _cscrolled = true; }, { passive: true });
     hBtn.addEventListener('touchend', function(e) {
-      if (Math.abs(e.changedTouches[0].clientY - cardTouchY) < 10) {
-        e.preventDefault();
-        card.classList.toggle('closed');
-      }
+      if (_cscrolled) return;
+      e.preventDefault(); card.classList.toggle('closed');
     }, { passive: false });
-    hBtn.onclick = () => card.classList.toggle('closed');
 
     const body = document.createElement('div');
     body.className = 'cl-body';
@@ -1555,32 +1624,23 @@ function buildChecklist() {
 
       div.innerHTML = `<div class="ci-box"><span class="ci-tick">&#10003;</span></div><div><span class="ci-text">${item.text}</span>${badge}</div>`;
 
-      let touchStartY = 0;
-      let touchStartX = 0;
+      // Reliable tap vs scroll detection
+      let _ty = 0, _tx = 0, _scrolled = false;
       div.addEventListener('touchstart', function(e) {
-        touchStartY = e.touches[0].clientY;
-        touchStartX = e.touches[0].clientX;
+        _ty = e.touches[0].clientY;
+        _tx = e.touches[0].clientX;
+        _scrolled = false;
+      }, { passive: true });
+      div.addEventListener('touchmove', function(e) {
+        if (Math.abs(e.touches[0].clientY - _ty) > 8) _scrolled = true;
       }, { passive: true });
       div.addEventListener('touchend', function(e) {
-        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
-        const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
-        // Only toggle if it was a tap, not a scroll
-        if (dy < 10 && dx < 10) {
-          e.preventDefault();
-          checked[key] = !checked[key];
-          div.classList.toggle('done', !!checked[key]);
-          saveData();
-          updateProgress();
-          updateCel(si);
-        }
-      }, { passive: false });
-      div.addEventListener('click', function(e) {
+        if (_scrolled) return; // Was a scroll, ignore
+        e.preventDefault();
         checked[key] = !checked[key];
         div.classList.toggle('done', !!checked[key]);
-        saveData();
-        updateProgress();
-        updateCel(si);
-      });
+        saveData(); updateProgress(); updateCel(si);
+      }, { passive: false });
       body.appendChild(div);
     });
 
@@ -1799,15 +1859,13 @@ function buildCVAudit() {
     const h = document.createElement('button');
     h.className = 'cv-section-header';
     h.innerHTML = `<span class="cv-section-title">${sec.t}</span><span style="color:var(--muted);font-size:12px;">&#9660;</span>`;
-    let cvTouchY = 0;
-    h.addEventListener('touchstart', function(e) { cvTouchY = e.touches[0].clientY; }, { passive: true });
+    let _vty = 0, _vscrolled = false;
+    h.addEventListener('touchstart', function(e) { _vty = e.touches[0].clientY; _vscrolled = false; }, { passive: true });
+    h.addEventListener('touchmove', function(e) { if(Math.abs(e.touches[0].clientY - _vty) > 8) _vscrolled = true; }, { passive: true });
     h.addEventListener('touchend', function(e) {
-      if (Math.abs(e.changedTouches[0].clientY - cvTouchY) < 10) {
-        e.preventDefault();
-        card.classList.toggle('closed');
-      }
+      if (_vscrolled) return;
+      e.preventDefault(); card.classList.toggle('closed');
     }, { passive: false });
-    h.onclick = () => card.classList.toggle('closed');
 
     const body = document.createElement('div');
     sec.q.forEach((q, qi) => {
@@ -1861,216 +1919,242 @@ function updateCVScore() {
 }
 
 /* ════════════════════════════════════════
-   BUDGET — Full Calculator with Currency
+   BUDGET — Fixed Calculator
 ════════════════════════════════════════ */
-
-// Approximate rates to USD (user can override)
 const DEFAULT_RATES = {
-  USD: 1, NGN: 1600, GHS: 15.5, KES: 130, ZAR: 18.5,
-  GBP: 0.79, EUR: 0.92, JPY: 150
+  USD:1, NGN:1600, GHS:15.5, KES:130, ZAR:18.5,
+  GBP:0.79, EUR:0.92, JPY:150
 };
-
 const CURRENCY_SYMBOLS = {
   USD:'$', NGN:'₦', GHS:'₵', KES:'KSh', ZAR:'R', GBP:'£', EUR:'€', JPY:'¥'
 };
 
-let userRates = { ...DEFAULT_RATES };
-
-function updateCurrencyRates() {
-  const cur = document.getElementById('b-currency').value;
-  const sym = CURRENCY_SYMBOLS[cur] || cur;
-  const rate = DEFAULT_RATES[cur];
-
-  // Update rate field with default
-  const rateField = document.getElementById('b-rate');
-  if (rateField && !rateField.value) rateField.value = rate !== 1 ? rate : '';
-
-  // Update labels
-  ['b-cur-label','b-mon-label','b-tar-label'].forEach((id, i) => {
-    const labels = ['Current Savings', 'Monthly Savings', 'Savings Target'];
-    const el = document.getElementById(id);
-    if (el) el.textContent = labels[i] + ' (' + cur + ')';
-  });
-
-  const rateInfo = document.getElementById('rate-info');
-  if (rateInfo) {
-    if (cur === 'USD') {
-      rateInfo.textContent = 'You are using USD. No conversion needed.';
-    } else {
-      rateInfo.textContent = `Default rate: 1 USD ≈ ${rate} ${cur}. Update the rate field with today's rate from Google for accuracy.`;
-    }
-  }
-  calcBudget();
-}
-
-function fetchRate() {
-  const cur = document.getElementById('b-currency').value;
-  if (cur === 'USD') { alert('You are already using USD. No conversion needed.'); return; }
-  const url = `https://www.google.com/search?q=1+USD+to+${cur}`;
-  window.open(url, '_blank');
-  alert(`Google will show the current rate. Come back and enter it in the "Rate to USD" field, then your numbers will update automatically.`);
+function getCurrency() {
+  return document.getElementById('b-currency') ? document.getElementById('b-currency').value : 'USD';
 }
 
 function getRateToUSD() {
-  const cur = document.getElementById('b-currency').value;
-  const rateField = document.getElementById('b-rate');
-  const manualRate = rateField ? parseFloat(rateField.value) : 0;
-  if (manualRate > 0) return manualRate;
-  return DEFAULT_RATES[cur] || 1;
+  const cur = getCurrency();
+  if (cur === 'USD') return 1;
+  const manualRate = parseFloat(document.getElementById('b-rate') ? document.getElementById('b-rate').value : 0);
+  return manualRate > 0 ? manualRate : (DEFAULT_RATES[cur] || 1);
 }
 
-function toUSD(amount) {
-  const rate = getRateToUSD();
-  return amount / rate;
+function getSym() {
+  return CURRENCY_SYMBOLS[getCurrency()] || getCurrency();
 }
 
-function fromUSD(usdAmount) {
-  return usdAmount * getRateToUSD();
+function localToUSD(amount) {
+  return amount / getRateToUSD();
 }
 
-function formatLocal(usdAmount) {
-  const cur = document.getElementById('b-currency').value;
+function usdToLocal(usd) {
+  return usd * getRateToUSD();
+}
+
+function fmtLocal(usd) {
+  return getSym() + Math.round(usdToLocal(usd)).toLocaleString();
+}
+
+function fmtUSD(usd) {
+  return '$' + Math.round(usd).toLocaleString();
+}
+
+function onCurrencyChange() {
+  const cur = getCurrency();
   const sym = CURRENCY_SYMBOLS[cur] || cur;
-  const local = fromUSD(usdAmount);
-  return sym + Math.round(local).toLocaleString();
+  const rateRow = document.getElementById('b-rate-row');
+  const usdNote = document.getElementById('b-usd-note');
+  const curLabel = document.getElementById('b-currency-label');
+
+  if (cur === 'USD') {
+    if (rateRow) rateRow.style.display = 'none';
+    if (usdNote) usdNote.style.display = 'block';
+    if (curLabel) curLabel.textContent = '(USD)';
+  } else {
+    if (rateRow) rateRow.style.display = 'block';
+    if (usdNote) usdNote.style.display = 'none';
+    if (curLabel) curLabel.textContent = '(' + cur + ')';
+    // Set default rate
+    const rateField = document.getElementById('b-rate');
+    if (rateField && !rateField.value) {
+      rateField.value = DEFAULT_RATES[cur] || '';
+    }
+    // Update hint
+    const hint = document.getElementById('rate-hint');
+    if (hint) {
+      const def = DEFAULT_RATES[cur];
+      hint.textContent = `Approximate rate: 1 USD ≈ ${def} ${cur}. Tap "Check rate" to get today's live rate from Google.`;
+    }
+  }
+  // Clear budget inputs when currency changes
+  ['b-cur','b-mon','b-tar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const res = document.getElementById('b-result');
+  const chart = document.getElementById('b-chart');
+  if (res) res.style.display = 'none';
+  if (chart) chart.style.display = 'none';
+}
+
+function openGoogleRate() {
+  const cur = getCurrency();
+  window.open('https://www.google.com/search?q=1+USD+to+' + cur, '_blank');
 }
 
 function calcBudget() {
-  const cur = document.getElementById('b-currency').value;
-  const sym = CURRENCY_SYMBOLS[cur] || cur;
+  const cur = getCurrency();
+  const sym = getSym();
   const rate = getRateToUSD();
 
-  const rawCur = parseFloat(document.getElementById('b-cur').value) || 0;
-  const rawMon = parseFloat(document.getElementById('b-mon').value) || 0;
-  const rawTar = parseFloat(document.getElementById('b-tar').value) || 0;
-  const sal = parseFloat(document.getElementById('b-sal').value) || 0;
+  const rawCur = parseFloat(document.getElementById('b-cur') ? document.getElementById('b-cur').value : 0) || 0;
+  const rawMon = parseFloat(document.getElementById('b-mon') ? document.getElementById('b-mon').value : 0) || 0;
+  const rawTar = parseFloat(document.getElementById('b-tar') ? document.getElementById('b-tar').value : 0) || 0;
+  const sal = parseFloat(document.getElementById('b-sal') ? document.getElementById('b-sal').value : 0) || 0;
 
-  // Convert to USD for calculation
-  const curUSD = cur === 'USD' ? rawCur : rawCur / rate;
-  const monUSD = cur === 'USD' ? rawMon : rawMon / rate;
-  const tarUSD = cur === 'USD' ? rawTar : rawTar / rate;
+  // All amounts are in the user's selected currency
+  // Convert to USD for standardised calculation
+  const curUSD = localToUSD(rawCur);
+  const monUSD = localToUSD(rawMon);
+  const tarUSD = localToUSD(rawTar);
 
   if (rawTar === 0) return;
 
   const res = document.getElementById('b-result');
   const chart = document.getElementById('b-chart');
   const tip = document.getElementById('b-tip');
-  res.style.display = 'block';
-  chart.style.display = 'block';
+  if (res) res.style.display = 'block';
+  if (chart) chart.style.display = 'block';
 
   // Progress bar
-  const pct = Math.min(100, tarUSD > 0 ? Math.round((curUSD / tarUSD) * 100) : 0);
+  const pct = tarUSD > 0 ? Math.min(100, Math.round((curUSD / tarUSD) * 100)) : 0;
   const barEl = document.getElementById('chart-bar');
   const pctEl = document.getElementById('chart-saved-pct');
   if (barEl) barEl.style.width = pct + '%';
   if (pctEl) pctEl.textContent = pct + '%';
 
-  const equiv = document.getElementById('b-equiv');
+  const equivEl = document.getElementById('b-usd-equiv');
+  const needEl = document.getElementById('b-still-need');
 
   if (curUSD >= tarUSD) {
     document.getElementById('b-months').textContent = '🎉';
-    document.getElementById('b-msg').textContent = 'You have hit your savings target! You are financially ready.';
-    if (equiv) equiv.textContent = '';
-    tip.style.display = 'block';
-    tip.innerHTML = '<div class="info-box green">You are ready! Focus on completing your application now.</div>';
-    drawMonthlyChart(0, tarUSD, monUSD, cur);
-  } else if (monUSD <= 0) {
+    document.getElementById('b-msg').textContent = 'You have hit your savings target! You are financially ready to move to Japan.';
+    if (equivEl) equivEl.textContent = 'Target: ' + fmtLocal(tarUSD) + (cur !== 'USD' ? ' ≈ ' + fmtUSD(tarUSD) : '');
+    if (needEl) needEl.textContent = 'Still needed: ' + sym + '0 — You are ready!';
+    if (tip) { tip.style.display = 'block'; tip.innerHTML = '<div class="info-box green">You are financially ready! Focus on completing your application now.</div>'; }
+    drawMonthlyChart(curUSD, tarUSD, monUSD);
+  } else if (rawMon === 0) {
     document.getElementById('b-months').textContent = '?';
-    document.getElementById('b-msg').textContent = 'Enter your monthly savings amount to calculate your timeline.';
-    if (equiv) equiv.textContent = '';
-    tip.style.display = 'none';
+    document.getElementById('b-msg').textContent = 'Enter how much you save per month to calculate your timeline.';
+    if (equivEl) equivEl.textContent = '';
+    if (needEl) needEl.textContent = '';
+    if (tip) tip.style.display = 'none';
   } else {
     const months = Math.ceil((tarUSD - curUSD) / monUSD);
-    const needed = tarUSD - curUSD;
     document.getElementById('b-months').textContent = months;
 
+    // Clear message
     let msg = '';
-    if (cur !== 'USD') {
-      msg = `Save ${sym}${Math.round(rawMon).toLocaleString()}/month (≈ $${Math.round(monUSD).toLocaleString()}) and hit your target in ${months} month${months===1?'':'s'}.`;
+    if (cur === 'USD') {
+      msg = 'Save ' + fmtUSD(monUSD) + ' per month and hit your ' + fmtUSD(tarUSD) + ' target in ' + months + ' month' + (months === 1 ? '' : 's') + '.';
     } else {
-      msg = `Save $${Math.round(monUSD).toLocaleString()}/month and hit your $${Math.round(tarUSD).toLocaleString()} target in ${months} month${months===1?'':'s'}.`;
+      msg = 'Save ' + sym + Math.round(rawMon).toLocaleString() + ' per month and hit your target in ' + months + ' month' + (months === 1 ? '' : 's') + '.';
     }
     document.getElementById('b-msg').textContent = msg;
 
-    if (equiv && cur !== 'USD') {
-      equiv.textContent = `Still need: ${sym}${Math.round(fromUSD(needed)).toLocaleString()} ≈ $${Math.round(needed).toLocaleString()}`;
-    } else if (equiv) {
-      equiv.textContent = `Still need: $${Math.round(needed).toLocaleString()}`;
+    // USD equivalent line
+    if (equivEl && cur !== 'USD') {
+      equivEl.textContent = 'Your target: ' + fmtLocal(tarUSD) + ' ≈ ' + fmtUSD(tarUSD);
+    } else if (equivEl) {
+      equivEl.textContent = '';
     }
 
-    tip.style.display = 'block';
-    let salNote = '';
-    if (sal > 0) { const salUSD = sal / 150; salNote = ` Your ALT salary of ¥${Math.round(sal).toLocaleString()} (≈ $${Math.round(salUSD).toLocaleString()}) will cover living costs.`; }
-    tip.innerHTML = `<div class="info-box blue">This target is just to bridge the gap before your first paycheck.${salNote}</div>`;
+    // Still needed
+    const stillNeeded = tarUSD - curUSD;
+    if (needEl) {
+      if (cur === 'USD') {
+        needEl.textContent = 'Still needed: ' + fmtUSD(stillNeeded);
+      } else {
+        needEl.textContent = 'Still needed: ' + sym + Math.round(usdToLocal(stillNeeded)).toLocaleString() + ' ≈ ' + fmtUSD(stillNeeded);
+      }
+    }
 
-    drawMonthlyChart(curUSD, tarUSD, monUSD, cur);
+    if (tip) {
+      tip.style.display = 'block';
+      let salNote = '';
+      if (sal > 0) {
+        const salUSD = sal / 150;
+        salNote = ' Your ALT salary of ¥' + Math.round(sal).toLocaleString() + ' (≈ ' + fmtUSD(salUSD) + '/month) will cover your living costs once you arrive.';
+      }
+      tip.innerHTML = '<div class="info-box blue">This savings target is just to bridge the gap before your first paycheck.' + salNote + '</div>';
+    }
+    drawMonthlyChart(curUSD, tarUSD, monUSD);
   }
 
-  convertCurrency();
+  // Update target label on chart
+  const tl = document.getElementById('chart-target-label');
+  if (tl) tl.textContent = fmtLocal(tarUSD) + ' ✓';
 }
 
-function drawMonthlyChart(curUSD, tarUSD, monUSD, cur) {
+function drawMonthlyChart(curUSD, tarUSD, monUSD) {
   const container = document.getElementById('monthly-chart');
   if (!container) return;
   container.innerHTML = '';
+  if (monUSD <= 0 || tarUSD <= 0) return;
 
-  const months = monUSD > 0 ? Math.min(12, Math.ceil((tarUSD - curUSD) / monUSD) + 1) : 6;
-  const sym = CURRENCY_SYMBOLS[cur] || cur;
-  const rate = getRateToUSD();
+  const months = Math.min(12, Math.max(2, Math.ceil((tarUSD - curUSD) / monUSD) + 1));
 
   for (let m = 0; m <= months; m++) {
     const savedUSD = Math.min(tarUSD, curUSD + (monUSD * m));
     const pct = tarUSD > 0 ? (savedUSD / tarUSD) * 100 : 0;
     const isComplete = savedUSD >= tarUSD;
 
+    const col = document.createElement('div');
+    col.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;';
+
     const bar = document.createElement('div');
-    bar.style.cssText = `flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;`;
+    bar.style.cssText = 'width:100%;border-radius:3px 3px 0 0;min-height:4px;';
+    bar.style.height = Math.max(4, pct * 0.72) + 'px';
+    bar.style.background = isComplete ? 'var(--green)' : 'var(--gold)';
 
-    const barInner = document.createElement('div');
-    barInner.style.cssText = `width:100%;border-radius:4px 4px 0 0;transition:height 0.4s;background:${isComplete?'var(--green)':'var(--gold)'};`;
-    barInner.style.height = Math.max(4, pct * 0.7) + 'px';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:8px;color:var(--muted);text-align:center;white-space:nowrap;';
+    lbl.textContent = m === 0 ? 'Now' : 'M' + m;
 
-    const label = document.createElement('div');
-    label.style.cssText = `font-size:8px;color:var(--muted);text-align:center;`;
-    label.textContent = m === 0 ? 'Now' : 'M' + m;
-
-    bar.appendChild(barInner);
-    bar.appendChild(label);
-    container.appendChild(bar);
+    col.appendChild(bar);
+    col.appendChild(lbl);
+    container.appendChild(col);
   }
-
-  const targetLabel = document.getElementById('chart-target-label');
-  if (targetLabel) targetLabel.textContent = `$${Math.round(tarUSD).toLocaleString()} target ✓`;
 }
 
 function convertCurrency() {
-  const amount = parseFloat(document.getElementById('conv-amount').value) || 0;
-  const from = document.getElementById('conv-from').value;
-  const to = document.getElementById('conv-to').value;
+  const amount = parseFloat(document.getElementById('conv-amount') ? document.getElementById('conv-amount').value : 0) || 0;
+  const from = document.getElementById('conv-from') ? document.getElementById('conv-from').value : 'USD';
+  const to = document.getElementById('conv-to') ? document.getElementById('conv-to').value : 'USD';
   const result = document.getElementById('conv-result');
   const info = document.getElementById('conv-rate-info');
+
+  // Get rates - use user's manual rate if available
+  let fromRate = DEFAULT_RATES[from] || 1;
+  let toRate = DEFAULT_RATES[to] || 1;
+  const userCur = getCurrency();
+  const userRate = parseFloat(document.getElementById('b-rate') ? document.getElementById('b-rate').value : 0) || 0;
+  if (userRate > 0 && from === userCur) fromRate = userRate;
+  if (userRate > 0 && to === userCur) toRate = userRate;
+
   if (!result) return;
 
-  const fromRate = DEFAULT_RATES[from] || 1;
-  const toRate = DEFAULT_RATES[to] || 1;
-
-  // Use user's manual rate if they set it for their currency
-  const userCur = document.getElementById('b-currency').value;
-  const userRate = parseFloat(document.getElementById('b-rate').value) || 0;
-
-  let actualFromRate = fromRate;
-  let actualToRate = toRate;
-  if (userRate > 0 && from === userCur) actualFromRate = userRate;
-  if (userRate > 0 && to === userCur) actualToRate = userRate;
-
   if (amount > 0) {
-    const usd = amount / actualFromRate;
-    const converted = usd * actualToRate;
+    const inUSD = amount / fromRate;
+    const converted = inUSD * toRate;
     const sym = CURRENCY_SYMBOLS[to] || to;
-    result.textContent = sym + converted.toLocaleString(undefined, {maximumFractionDigits:2});
-    if (info) info.textContent = `1 ${from} ≈ ${(actualToRate/actualFromRate).toFixed(4)} ${to}  (update rates above for accuracy)`;
+    result.textContent = sym + converted.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const crossRate = (toRate / fromRate);
+    if (info) info.textContent = '1 ' + from + ' = ' + crossRate.toFixed(4) + ' ' + to;
   } else {
-    result.textContent = '--';
+    if (result) result.textContent = '--';
+    if (info) info.textContent = 'Enter an amount to convert.';
   }
 }
 
@@ -2283,6 +2367,7 @@ function loadTheme() {
 window.addEventListener('load', function() {
   loadTheme();
   showScreen('screen-login');
+  loadRememberedEmail();
 });
 
 /* ════════════════════════════════════════
